@@ -3,32 +3,61 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
 )
 
 func main() {
-	conf, _ := parseArgs()
-	fmt.Printf("Hello, %v, %v, %v\n", conf.Str, conf.Num, conf.Flg)
+	conf, err := parseArgs()
+	if err != nil {
+		log.Panic(err)
+	}
+
+	stuff, err := getStuff(conf.Token)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	fmt.Printf("found%v\n", stuff)
 }
 
+func getStuff(token string) (string, error) {
+	client := &http.Client{}
+
+	req, err := http.NewRequest("GET", "https://api.github.com", nil)
+
+	req.Header.Add("Authorization: token", token)
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+
+	return string(body), err
+}
+
+// Config is the application's configuration
 type Config struct {
-	Str string
-	Num int
-	Flg bool
+	Token string
 }
 
-func parseArgs() (Config, error) {
+func parseArgs() (*Config, error) {
 	// flag
-	strPtr := flag.String("word", "foo", "a string")
-	intPtr := flag.Int("number", 56, "an int")
-	flgPtr := flag.Bool("work", false, "a bool")
+	token := flag.String("token", "token", "A github oauth token")
 
 	flag.Parse()
 
-	return Config{
-		Str: *strPtr,
-		Num: *intPtr,
-		Flg: *flgPtr,
+	if token == nil {
+		return nil, errors.New("You must specify a token")
+	}
+
+	return &Config{
+		Token: *token,
 	}, nil
 }
